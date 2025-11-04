@@ -3,6 +3,7 @@ package com.example.lab12.ui.screens
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -13,6 +14,7 @@ import com.google.maps.android.compose.rememberMarkerState
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.Marker
 import com.example.lab12.R
+import com.google.android.gms.maps.CameraUpdateFactory
 
 
 @Composable
@@ -29,6 +31,16 @@ fun MapScreen() {
         LatLng(-16.4205151,-71.4945209),
         LatLng(-16.3524187,-71.5675994)
     )
+
+    LaunchedEffect(Unit) {
+        cameraPositionState.animate(
+            update = CameraUpdateFactory.newLatLngZoom(
+                LatLng(-16.2520984,-71.6836503),
+                12f
+            ),
+            durationMs = 3000
+        )
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
 
