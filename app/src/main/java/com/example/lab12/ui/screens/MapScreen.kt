@@ -17,25 +17,39 @@ import com.example.lab12.R
 
 @Composable
 fun MapScreen() {
-    val ArequipaLocation = LatLng(-16.4040102, -71.559611) // Arequipa, Perú
+    val arequipaLocation = LatLng(-16.4040102, -71.559611)
     val cameraPositionState = rememberCameraPositionState {
-        position = com.google.android.gms.maps.model.CameraPosition.fromLatLngZoom(ArequipaLocation, 12f)
+        position = com.google.android.gms.maps.model.CameraPosition.fromLatLngZoom(
+            arequipaLocation, 12f
+        )
     }
 
+    val locations = listOf(
+        LatLng(-16.433415,-71.5442652),
+        LatLng(-16.4205151,-71.4945209),
+        LatLng(-16.3524187,-71.5675994)
+    )
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Añadir GoogleMap al layout
+
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState
         ) {
-            // Añadir marcador en Arequipa Perú
+
             Marker(
-                state = rememberMarkerState(position = ArequipaLocation),
+                state = rememberMarkerState(position = arequipaLocation),
                 title = "Arequipa, Perú",
                 icon = BitmapDescriptorFactory.fromResource(R.drawable.ic_mountain)
             )
+
+            locations.forEach { location ->
+                Marker(
+                    state = rememberMarkerState(position = location),
+                    title = "Ubicación",
+                    snippet = "Punto de interés"
+                )
+            }
         }
     }
 }
-
