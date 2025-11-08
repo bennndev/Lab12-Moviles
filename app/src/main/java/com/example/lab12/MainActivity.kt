@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier
                     .fillMaxSize()
             ) {
-                MapTypeScreen()
+                MapScreen()
             }
         }
     }

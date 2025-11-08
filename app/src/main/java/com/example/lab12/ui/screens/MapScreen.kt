@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.maps.android.compose.GoogleMap
@@ -24,9 +25,34 @@ import com.google.android.gms.maps.model.RoundCap
 import com.google.android.gms.maps.model.SquareCap
 import com.google.android.gms.maps.model.Dash
 import com.google.android.gms.maps.model.Gap
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
+import android.os.Looper
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.location.LocationRequest
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.rememberCameraPositionState
+import com.google.maps.android.compose.rememberMarkerState
+import com.google.maps.android.compose.MapProperties
+import kotlinx.coroutines.launch
 
 @Composable
+@SuppressLint("MissingPermission")
 fun MapScreen() {
+    // Crear scope de corrutinas para animaciones de cámara
+    val scope = rememberCoroutineScope()
+
     val arequipaLocation = LatLng(-16.4040102, -71.559611)
     val cameraPositionState = rememberCameraPositionState {
         position = com.google.android.gms.maps.model.CameraPosition.fromLatLngZoom(
@@ -34,77 +60,115 @@ fun MapScreen() {
         )
     }
 
-    val mallAventuraPolygon = listOf(
-        LatLng(-16.432292, -71.509145),
-        LatLng(-16.432757, -71.509626),
-        LatLng(-16.433013, -71.509310),
-        LatLng(-16.432566, -71.508853)
-    )
+    // Estado de permisos y ubicación del usuario
+    val context = LocalContext.current
+    var hasLocationPermission by remember { mutableStateOf(false) }
+    var userLocation by remember { mutableStateOf<LatLng?>(null) }
 
-    val parqueLambramaniPolygon = listOf(
-        LatLng(-16.422704, -71.530830),
-        LatLng(-16.422920, -71.531340),
-        LatLng(-16.423264, -71.531110),
-        LatLng(-16.423050, -71.530600)
-    )
+    // Launcher de permisos
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms ->
+        hasLocationPermission = perms[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                perms[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (hasLocationPermission) {
+            val fused = LocationServices.getFusedLocationProviderClient(context)
+            fused.lastLocation.addOnSuccessListener { loc ->
+                if (loc != null) {
+                    val latLng = LatLng(loc.latitude, loc.longitude)
+                    userLocation = latLng
+                    cameraPositionState.move(
+                        CameraUpdateFactory.newLatLngZoom(latLng, 15f)
+                    )
+                }
+            }
+        }
+    }
 
-    val plazaDeArmasPolygon = listOf(
-        LatLng(-16.398866, -71.536961),
-        LatLng(-16.398744, -71.536529),
-        LatLng(-16.399178, -71.536289),
-        LatLng(-16.399299, -71.536721)
-    )
+    // Solicitud de permisos al iniciar
+    LaunchedEffect(Unit) {
+        val fineGranted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        hasLocationPermission = fineGranted || coarseGranted
+        if (!hasLocationPermission) {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        } else {
+            val fused = LocationServices.getFusedLocationProviderClient(context)
+            fused.lastLocation.addOnSuccessListener { loc ->
+                if (loc != null) {
+                    val latLng = LatLng(loc.latitude, loc.longitude)
+                    userLocation = latLng
+                    cameraPositionState.move(
+                        CameraUpdateFactory.newLatLngZoom(latLng, 15f)
+                    )
+                }
+            }
+        }
+    }
 
+    // Callback para actualizaciones en tiempo real
+    val locationCallback = remember {
+        object : LocationCallback() {
+            override fun onLocationResult(result: LocationResult) {
+                val loc = result.lastLocation ?: return
+                val latLng = LatLng(loc.latitude, loc.longitude)
+                userLocation = latLng
+                // Usar corrutina para la función suspend animate(...)
+                scope.launch {
+                    cameraPositionState.animate(CameraUpdateFactory.newLatLng(latLng))
+                }
+            }
+        }
+    }
+
+    // Iniciar/detener actualizaciones de ubicación mientras el Composable esté activo
+    LaunchedEffect(hasLocationPermission) {
+        if (hasLocationPermission) {
+            val fused = LocationServices.getFusedLocationProviderClient(context)
+            val request = LocationRequest.Builder(2000L)
+                .setMinUpdateIntervalMillis(1000L)
+                .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
+                .build()
+            fused.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
+        }
+    }
+
+    // Render del mapa y marcadores (fallback y en tiempo real)
     Box(modifier = Modifier.fillMaxSize()) {
-
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState
         ) {
+            // Marcador de fallback en Arequipa (azul) si aún no hay ubicación del usuario
+            if (userLocation == null) {
+                Marker(
+                    state = rememberMarkerState(position = arequipaLocation),
+                    title = "Arequipa, Perú",
+                    icon = BitmapDescriptorFactory.defaultMarker(
+                        BitmapDescriptorFactory.HUE_BLUE
+                    )
+                )
+            }
 
-            Marker(
-                state = rememberMarkerState(position = arequipaLocation),
-                title = "Arequipa, Perú",
-                icon = BitmapDescriptorFactory.fromResource(R.drawable.ic_mountain)
-            )
-
-            Polygon(
-                points = mallAventuraPolygon,
-                strokeColor = Color.Red,
-                fillColor = Color.Blue.copy(alpha = 0.3f),
-                strokeWidth = 5f
-            )
-
-            Polygon(
-                points = parqueLambramaniPolygon,
-                strokeColor = Color.Red,
-                fillColor = Color.Blue.copy(alpha = 0.3f),
-                strokeWidth = 5f
-            )
-
-            Polygon(
-                points = plazaDeArmasPolygon,
-                strokeColor = Color.Red,
-                fillColor = Color.Blue.copy(alpha = 0.3f),
-                strokeWidth = 5f
-            )
-
-            // EJEMPLO 3: Rectángulo con patrón
-            val dashedRectanglePoints = listOf(
-                LatLng(-16.4000, -71.5400),
-                LatLng(-16.4000, -71.5300),
-                LatLng(-16.3900, -71.5300),
-                LatLng(-16.3900, -71.5400),
-                LatLng(-16.4000, -71.5400)
-            )
-            Polyline(
-                points = dashedRectanglePoints,
-                color = Color(0xFFD81B60), // Magenta
-                width = 10f,
-                startCap = SquareCap(),
-                endCap = SquareCap(),
-                pattern = listOf(Dash(20f), Gap(12f))
-            )
+            // Marcador rojo en la ubicación del usuario cuando esté disponible
+            userLocation?.let { latLng ->
+                Marker(
+                    state = rememberMarkerState(position = latLng),
+                    title = "Mi ubicación",
+                    icon = BitmapDescriptorFactory.defaultMarker(
+                        BitmapDescriptorFactory.HUE_RED
+                    )
+                )
+            }
         }
     }
 }
