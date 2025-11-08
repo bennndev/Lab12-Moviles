@@ -18,6 +18,12 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.google.maps.android.compose.Polygon
+import com.google.maps.android.compose.Polyline
+import com.google.android.gms.maps.model.JointType
+import com.google.android.gms.maps.model.RoundCap
+import com.google.android.gms.maps.model.SquareCap
+import com.google.android.gms.maps.model.Dash
+import com.google.android.gms.maps.model.Gap
 
 @Composable
 fun MapScreen() {
@@ -82,6 +88,45 @@ fun MapScreen() {
                 fillColor = Color.Blue.copy(alpha = 0.3f),
                 strokeWidth = 5f
             )
+
+            // EJEMPLO 3: Rectángulo con patrón
+            val dashedRectanglePoints = listOf(
+                LatLng(-16.4000, -71.5400),
+                LatLng(-16.4000, -71.5300),
+                LatLng(-16.3900, -71.5300),
+                LatLng(-16.3900, -71.5400),
+                LatLng(-16.4000, -71.5400)
+            )
+            Polyline(
+                points = dashedRectanglePoints,
+                color = Color(0xFFD81B60), // Magenta
+                width = 10f,
+                startCap = SquareCap(),
+                endCap = SquareCap(),
+                pattern = listOf(Dash(20f), Gap(12f))
+            )
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
