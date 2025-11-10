@@ -150,7 +150,7 @@ fun MapPlacesScreen() {
                         }
                 }
             }
-            .addOnFailureListener {
+            .addOnFailureListener { 
             }
     }
 
